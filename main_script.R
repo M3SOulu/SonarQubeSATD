@@ -153,4 +153,44 @@ summary(df_agg$x)
 # Normality test
 shapiro.test(df_agg$x)
 
+# We remove the SQUID.1135 and SQUID.1134 columns, which are SonarQube's
+# issues for TODO and FIXME comments. So they might have huge coefficients.
+df <- df[-grep("squid\\.S1134", names(df))]
+df <- df[-grep("squid\\.S1135", names(df))]
 
+### Normalize all the issues
+odd_indexes<-seq(1,nrow(df),2)
+df <- arrange(df, id, desc(SATD))
+df[is.na(df)] <- 0
+df <- df[, colSums(df != 0) > 0]
+# Choose the right depending on which df you are using
+project_and_file_column <- c("projectID", "file_added")
+project_and_file_column <- c("projectID", "file_deleted")
+
+list_of_columns <- colnames(df)
+list_of_columns <- list_of_columns[list_of_columns %like% "^code_smells" | list_of_columns %like% "^squid" | list_of_columns %like% "^common.java"]
+for (column_name in list_of_columns){
+  df[,paste0(column_name, "_norm")] <- NA
+  df[,paste0(column_name, "_norm")] <- ave(df[,column_name], df[,project_and_file_column], FUN=function(x) (x-min(x))/(max(x) - min(x)))
+}
+
+# Replace possible NaNs
+is.nan.data.frame <- function(x) do.call(cbind, lapply(x, is.nan))
+df[is.nan(df)] <- 0
+
+# Creating the Issue formulas
+list_of_columns <- colnames(df)
+list_of_columns <- list_of_columns[list_of_columns %like% "_norm$"]
+list_of_columns_no_fixme_todo <- list_of_columns[!list_of_columns %in% c("squid.S1134_norm", "squid.S1135_norm")]
+column_formula <- paste(list_of_columns_no_fixme_todo, collapse = " + ")
+
+column_formula <- paste("SATD ~ ", column_formula, sep = "")
+column_formula <- paste(column_formula, " + (1|projectID/file_added/id)", sep = "")
+column_formula <- paste(column_formula, " + (1|projectID/file_deleted/id)", sep = "")
+
+column_formula <- as.formula(column_formula)
+
+# Running the issue analysis
+# Tables 9 & 11
+lmer_model_no_todo_fixme_norm <- glmer(column_formula, data = df, family = "binomial")
+summary(lmer_model_no_todo_fixme_norm)
