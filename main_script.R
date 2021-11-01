@@ -32,6 +32,7 @@ load_and_process_data_file <- function(level="commit", satd_type="add", data_fil
   return(df_temp)
 }
 
+# Eliminate data pairs, where at least one has missing values
 eliminate_redundant_data <- function(data_df = df)
 {
   # Eliminating the pairs, where at least one didn't have an analysis date
@@ -58,6 +59,29 @@ load_sonar_measures <- function(data_filename = ""){
   return(sonar_measures_all)
 }
 
+# Normalize the data within projects
+normalize_data_within_projects <- function(data_df = df)
+{
+  data_df$ncloc_norm <- ave(data_df$ncloc, data_df$projectID, FUN=function(x) (x-min(x))/(max(x) - min(x)))
+  data_df$sqaleIndex_norm <- ave(data_df$sqaleIndex, data_df$projectID, FUN=function(x) (x-min(x))/(max(x) - min(x)))
+  data_df$reliabilityRemediationEffort_norm <- ave(data_df$reliabilityRemediationEffort, data_df$projectID, FUN=function(x) (x-min(x))/(max(x) - min(x)))
+  data_df$securityRemediationEffort_norm <- ave(data_df$securityRemediationEffort, data_df$projectID, FUN=function(x) (x-min(x))/(max(x) - min(x)))
+  return(data_df)
+}
+
+create_table_1 <- function(data_df = df)
+{
+  df_agg <- aggregate(df$SATD, df[,c("projectID", "commitHash")], FUN=length)
+  # Number of pairs
+  print(paste0("Number of pairs: ", nrow(data_df)/2))
+  #KL-SATD in Commits summaries
+  print("Commit summary: ")
+  print(summary(df_agg$x))
+  #Normality test
+  shapiro_test <- shapiro.test(df_agg$x)
+  print(paste0("Normality test: ", shapiro_test$method, " , W = ", shapiro_test$statistic, " , p-value = ", shapiro_test$p.value))
+}
+
 ##### End of functions #####
 
 # 1.0 Load the data and combine with sonar measures
@@ -77,8 +101,21 @@ df <- left_join(df, sonar_measures, by = c("commitHash", "projectID"))
 # 1.3. Eliminate redundant / incomplete data
 df <- eliminate_redundant_data(data_df = df)
 
+# 1.4. Normalize data within projects
+df <- normalize_data_within_projects(data_df = df)
 
+# 2.0 Making the Table 1 for the paper
+create_table_1(data_df = df)
 
+# Depending on, whether you analyze additions or deletions, choose the right join operation
+df_agg <- aggregate(df$SATD, df[,c("projectID", "commitHash")], FUN=length)
+### Table 1 for paper
+# Number of pairs
+nrow(df)/2
+#KL-SATD in Commits summaries
+summary(df_agg$x)
+#Normality test
+shapiro_test <- shapiro.test(df_agg$x)
 
 ### Here we load the data. This is already interleaved data containing all of Sonar Issues
 
