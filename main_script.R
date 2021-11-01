@@ -5,7 +5,79 @@ library(dplyr)
 library(data.table)
 library(reshape2)
 library(stringr)
-#library(sonarsatd)
+
+###### Functions to load and preprocess the data #####
+
+# Loading the data from csv-files, and processing it
+load_and_process_data_file <- function(level="commit", satd_type="add", data_filename = "")
+{
+  df_temp <- read.csv(data_filename, fileEncoding = "utf-8", stringsAsFactors = FALSE)
+  if (level=="commit")
+    {
+    df_temp <- df_temp[,1:4]
+    }
+  if(satd_type=="add")
+    {
+    names(df_temp)[names(df_temp)=="commit_added"] <- "commitHash"
+    }
+  else if(satd_type == "del")
+    {
+    names(df_temp)[names(df_temp)=="commit_deleted"] <- "commitHash"
+    }
+  else
+    {
+      stop("Wrong satd_type")
+      }
+  df_temp$commitHash <- sub("^$", "NO_PARENT", df_temp$commitHash)
+  return(df_temp)
+}
+
+eliminate_redundant_data <- function(data_df = df)
+{
+  # Eliminating the pairs, where at least one didn't have an analysis date
+  data_df <- data_df[!is.na(data_df$SQAnalysisDate),]
+  na_ids <- data_df$id
+  na_ids <- na_ids[duplicated(na_ids)]
+  data_df <- subset(data_df, (id %in% na_ids))
+  
+  # Eliminating the pairs, where commit level metrics were all zero
+  data_df <- data_df[data_df$ncloc != 0 & data_df$sqaleIndex != 0 & data_df$reliabilityRemediationEffort != 0 & data_df$securityRemediationEffort != 0,]
+  na_ids <- data_df$id
+  na_ids <- na_ids[duplicated(na_ids)]
+  data_df <- subset(data_df, (id %in% na_ids))
+  return(data_df)
+}
+
+# Loading ncloc, SqaleIndex, ReliabilityRemediationEffort, and SecurityRemediationEffort
+load_sonar_measures <- function(data_filename = ""){
+  sonar_measures_all <- read.csv(file = data_filename, stringsAsFactors = FALSE, strip.white = TRUE)
+  sonar_measures_all$commitHash <- str_trim(sonar_measures_all$commitHash)
+  sonar_measures_all$projectID <- str_trim(sonar_measures_all$projectID)
+  # Keep only ncloc, sqale, reliability, security
+  sonar_measures_all <- sonar_measures_all[,c(1:3,34, 48, 56, 58)]
+  return(sonar_measures_all)
+}
+
+##### End of functions #####
+
+# 1.0 Load the data and combine with sonar measures
+# Parameters are as follows:
+# level = "commit" or "file"
+# satd_type = "add" or "del"
+# data_filename = path_to_the_data_file, e.g. "./data/comments/commit_added.csv"
+df <- load_and_process_data_file(level = "commit", satd_type = "add", data_filename = "./data/comments/commit_added.csv")
+
+# 1.1. Load the sonar measures
+# data_filename = path_to_the_data_file, e.g. "./data/tdd_10/sonar_measures_all.csv"
+sonar_measures <- load_sonar_measures(data_filename = "data/tdd_10/sonar_measures_all.csv")
+
+# 1.2. Join the df and sonar measures
+df <- left_join(df, sonar_measures, by = c("commitHash", "projectID"))
+
+# 1.3. Eliminate redundant / incomplete data
+df <- eliminate_redundant_data(data_df = df)
+
+
 
 
 ### Here we load the data. This is already interleaved data containing all of Sonar Issues
