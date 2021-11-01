@@ -16,19 +16,33 @@ load_and_process_data_file <- function(level="commit", satd_type="add", data_fil
   if (level=="commit")
     {
     df_temp <- df_temp[,1:4]
-    }
+  }
+  else if(level=="file")
+  {
+    
+  }
+  else
+  {
+    stop("Wrong level.")
+  }
   if(satd_type=="add")
     {
     names(df_temp)[names(df_temp)=="commit_added"] <- "commitHash"
+    if(level=="file"){
+      names(df_temp)[names(df_temp)=="file_added"] <- "fileName"
     }
+  }
   else if(satd_type == "del")
     {
     names(df_temp)[names(df_temp)=="commit_deleted"] <- "commitHash"
+    if(level=="file"){
+      names(df_temp)[names(df_temp)=="file_deleted"] <- "fileName"
     }
+  }
   else
     {
-      stop("Wrong satd_type")
-      }
+      stop("Wrong satd_type.")
+    }
   df_temp$commitHash <- sub("^$", "NO_PARENT", df_temp$commitHash)
   return(df_temp)
 }
@@ -85,6 +99,19 @@ create_table_1 <- function(data_df = df)
   print(paste0("Normality test: ", shapiro_test$method, " , W = ", shapiro_test$statistic, " , p-value = ", shapiro_test$p.value))
 }
 
+create_table_2 <- function(data_df = df)
+{
+  df_agg <- aggregate(df$SATD, df[,c("projectID", "commitHash", "fileName")], FUN=length)
+  # Number of pairs
+  print(paste0("Number of pairs: ", nrow(data_df)/2))
+  #KL-SATD in Commits summaries
+  print("Commit summary: ")
+  print(summary(df_agg$x))
+  #Normality test
+  shapiro_test <- shapiro.test(df_agg$x)
+  print(paste0("Normality test: ", shapiro_test$method, " , W = ", shapiro_test$statistic, " , p-value = ", shapiro_test$p.value))
+}
+
 find_redundant_metrics <- function(data_df = df)
 {
   column_formula2 <- as.formula("~ ncloc_norm + sqaleIndex_norm + reliabilityRemediationEffort_norm + securityRemediationEffort_norm")
@@ -92,6 +119,7 @@ find_redundant_metrics <- function(data_df = df)
 }
 ##### End of functions #####
 
+### Start of commit-level analyses
 # 1.0 Load the data and combine with sonar measures
 # Parameters are as follows:
 # level = "commit" or "file"
@@ -101,6 +129,7 @@ df <- load_and_process_data_file(level = "commit", satd_type = "add", data_filen
 #df <- load_and_process_data_file(level = "commit", satd_type = "del", data_filename = "./data/comments/commit_deleted.csv")
 
 # 1.1. Load the sonar measures
+# Parameter is as follows:
 # data_filename = path_to_the_data_file, e.g. "./data/tdd_10/sonar_measures_all.csv"
 sonar_measures <- load_sonar_measures(data_filename = "data/tdd_10/sonar_measures_all.csv")
 
@@ -135,7 +164,34 @@ summary(lmer_model_minus_ncloc)
 lmer_model_minus_sqale <- glmer(SATD ~ ncloc_norm + reliabilityRemediationEffort_norm + securityRemediationEffort_norm  + (1 | projectID/id), data = df, family = "binomial")
 summary(lmer_model_minus_sqale)
 
-######## File level
+### Start of file-level analyses
+# 4.0 Loading the data (similarly as with commit-level)
+df <- load_and_process_data_file(level = "file", satd_type = "add", data_filename = "./data/comments/file_added.csv")
+df <- load_and_process_data_file(level = "file", satd_type = "del", data_filename = "./data/comments/file_deleted.csv")
+
+# 4.1. Load the sonar measures
+# Parameter is as follows:
+# data_filename = path_to_the_data_file, e.g. "./data/tdd_10/sonar_measures_all.csv"
+sonar_measures <- load_sonar_measures(data_filename = "data/tdd_10/sonar_measures_all.csv")
+
+# 4.2. Join the df and sonar measures
+df <- left_join(df, sonar_measures, by = c("commitHash", "projectID"))
+
+# 4.3. Eliminate redundant / incomplete data
+df <- eliminate_redundant_data(data_df = df)
+
+# 5.0 Making the Table 2 for the paper
+# Table 2 addition row is made with file-level added data, and deletion row with file-level deleted data
+create_table_2(data_df = df)
+
+# 5.1 Finding the possibly redundant commit-level metrics
+# p.12 "Before running the analysis on commit-level with Sqale Index, and the 2 Remediation Efforts, 
+# we wanted to avoid multi-collinearity issues with different metrics. This was done by utilizing redun-function
+# from Hmisc-package in R. We used the default threshold for cutoff (R\textsuperscript{2} 0.9).
+find_redundant_metrics(data_df = df)
+
+
+
 
 ### Here we load the data. This is already interleaved data containing all of Sonar Issues
 
