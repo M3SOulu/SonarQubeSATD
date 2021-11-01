@@ -5,7 +5,8 @@ library(dplyr)
 library(data.table)
 library(reshape2)
 library(stringr)
-
+library(Hmisc)
+library(lme4)
 ###### Functions to load and preprocess the data #####
 
 # Loading the data from csv-files, and processing it
@@ -46,6 +47,7 @@ eliminate_redundant_data <- function(data_df = df)
   na_ids <- data_df$id
   na_ids <- na_ids[duplicated(na_ids)]
   data_df <- subset(data_df, (id %in% na_ids))
+  data_df[is.na(data_df)] <- 0
   return(data_df)
 }
 
@@ -69,6 +71,7 @@ normalize_data_within_projects <- function(data_df = df)
   return(data_df)
 }
 
+# Creating Table 1
 create_table_1 <- function(data_df = df)
 {
   df_agg <- aggregate(df$SATD, df[,c("projectID", "commitHash")], FUN=length)
@@ -82,6 +85,11 @@ create_table_1 <- function(data_df = df)
   print(paste0("Normality test: ", shapiro_test$method, " , W = ", shapiro_test$statistic, " , p-value = ", shapiro_test$p.value))
 }
 
+find_redundant_metrics <- function(data_df = df)
+{
+  column_formula2 <- as.formula("~ ncloc_norm + sqaleIndex_norm + reliabilityRemediationEffort_norm + securityRemediationEffort_norm")
+  print(redun(column_formula2, data=data_df))
+}
 ##### End of functions #####
 
 # 1.0 Load the data and combine with sonar measures
@@ -90,6 +98,7 @@ create_table_1 <- function(data_df = df)
 # satd_type = "add" or "del"
 # data_filename = path_to_the_data_file, e.g. "./data/comments/commit_added.csv"
 df <- load_and_process_data_file(level = "commit", satd_type = "add", data_filename = "./data/comments/commit_added.csv")
+#df <- load_and_process_data_file(level = "commit", satd_type = "del", data_filename = "./data/comments/commit_deleted.csv")
 
 # 1.1. Load the sonar measures
 # data_filename = path_to_the_data_file, e.g. "./data/tdd_10/sonar_measures_all.csv"
@@ -104,106 +113,19 @@ df <- eliminate_redundant_data(data_df = df)
 # 1.4. Normalize data within projects
 df <- normalize_data_within_projects(data_df = df)
 
-# 2.0 Making the Table 1 for the paper
+# 2.0 Making the Table 1 & 2 for the paper
+# Table 1 addition row is made with commit-level added data, and deletion row with commit-level deleted data
 create_table_1(data_df = df)
 
-# Depending on, whether you analyze additions or deletions, choose the right join operation
-df_agg <- aggregate(df$SATD, df[,c("projectID", "commitHash")], FUN=length)
-### Table 1 for paper
-# Number of pairs
-nrow(df)/2
-#KL-SATD in Commits summaries
-summary(df_agg$x)
-#Normality test
-shapiro_test <- shapiro.test(df_agg$x)
-
-### Here we load the data. This is already interleaved data containing all of Sonar Issues
-
-# File-level
-df_a <- read.csv(file = "./data/comments/todo_fixme_file_data_added_june_21.csv", fileEncoding = "utf-8", stringsAsFactors = FALSE)
-df_d <- read.csv(file = "./data/comments/todo_fixme_file_data_deleted_june_21.csv", fileEncoding = "utf-8", stringsAsFactors = FALSE)
-
-######### Commit level
-
-### Here we load the data. This is already interleaved data containing all of Sonar Issues
-
-df_a <- read.csv(file = "./data/comments/todo_fixme_commit_data4_added_june_21.csv", fileEncoding = "utf-8", stringsAsFactors = FALSE)
-df_d <- read.csv(file = "./data/comments/todo_fixme_commit_data4_deleted_june_21.csv", fileEncoding = "utf-8", stringsAsFactors = FALSE)
-df_a <- df_a[,1:4]
-df_d <- df_d[,1:4]
-
-# Replacing the empty columns
-df_a$commit_added <- sub("^$", "NO_PARENT", df_a$commit_added)
-df_d$commit_deleted <- sub("^$", "NO_PARENT", df_d$commit_deleted)
-
-# Choose here the df, you want to use
-df <- df_a
-df <- df_d
-########## Combine with Sonarqube measures
-sonar_measures_all <- read.csv(file = "data/tdd_10/sonar_measures_all.csv", stringsAsFactors = FALSE, strip.white = TRUE)
-sonar_measures_all$commitHash <- str_trim(sonar_measures_all$commitHash)
-sonar_measures_all$projectID <- str_trim(sonar_measures_all$projectID)
-# ncloc, reliability, security
-sonar_measures_all <- sonar_measures_all[,c(1:3,34, 48, 56, 58)]
-
-# Depending on, whether you analyze additions or deletions, choose the right join operation
-df <- left_join(df, sonar_measures_all, by = c("commit_added" = "commitHash", "projectID"))
-df <- left_join(df, sonar_measures_all, by = c("commit_deleted" = "commitHash", "projectID"))
-
-# Eliminating the pairs, where at least one didn't have an analysis date
-df <- df[!is.na(df$SQAnalysisDate),]
-na_ids <- df$id
-na_ids <- na_ids[duplicated(na_ids)]
-df <- subset(df, (id %in% na_ids))
-
-# Eliminating the pairs, where commit level metrics were all zero
-df <- df[df$ncloc != 0 & df$sqaleIndex != 0 & df$reliabilityRemediationEffort != 0 & df$securityRemediationEffort != 0,]
-na_ids <- df$id
-na_ids <- na_ids[duplicated(na_ids)]
-df <- subset(df, (id %in% na_ids))
-
-# Normalization within projects
-df$ncloc_norm <- ave(df$ncloc, df$projectID, FUN=function(x) (x-min(x))/(max(x) - min(x)))
-df$sqaleIndex_norm <- ave(df$sqaleIndex, df$projectID, FUN=function(x) (x-min(x))/(max(x) - min(x)))
-df$reliabilityRemediationEffort_norm <- ave(df$reliabilityRemediationEffort, df$projectID, FUN=function(x) (x-min(x))/(max(x) - min(x)))
-df$securityRemediationEffort_norm <- ave(df$securityRemediationEffort, df$projectID, FUN=function(x) (x-min(x))/(max(x) - min(x)))
-
-### Making the Table 1 for the paper
-
-# Depending on, whether you analyze additions or deletions, choose the right join operation
-df_agg <- aggregate(df$SATD, df[,c("projectID", "commit_added")], FUN=length)
-df_agg <- aggregate(df$SATD, df[,c("projectID", "commit_deleted")], FUN=length)
-
-### Table 1 for paper
-# Number of pairs
-nrow(df)/2
-#KL-SATD in Commits summaries
-summary(df_agg$x)
-#Normality test
-shapiro.test(df_agg$x)
-
-### Creating the formula for mixed models
-df_col_names <- colnames(df)
-list_to_remove <- c("commit_added", "commit_deleted", "file_added", "file_deleted", "SATD", "weights", "weights_norm", "id", "commitHash", "projectID", "SQAnalysisDate", "functionComplexityDistribution",
-                    "fileComplexityDistribution", "lastCommitDate", "nclocLanguageDistribution", "alertStatus",
-                    "qualityGateDetails", "qualityProfiles", "sqaleIndex", "reliabilityRemediationEffort", "securityRemediationEffort", "ncloc")
-df_col_names <- df_col_names[!df_col_names %in% list_to_remove]
-column_formula <- paste(df_col_names, collapse = " + ")
-column_formula <- paste("SATD ~ ", column_formula, sep = "")
-column_formula <- paste(column_formula, " + (1|projectID/id)", sep = "")
-column_formula <- as.formula(column_formula)
-
-### Finding the possibly redundant commit-level metrics
+# 2.1 Finding the possibly redundant commit-level metrics
 # p.12 "Before running the analysis on commit-level with Sqale Index, and the 2 Remediation Efforts, 
 # we wanted to avoid multi-collinearity issues with different metrics. This was done by utilizing redun-function
 # from Hmisc-package in R. We used the default threshold for cutoff (R\textsuperscript{2} 0.9).
-library(Hmisc)
-column_formula2 <- as.formula("~ ncloc_norm + sqaleIndex_norm + reliabilityRemediationEffort_norm + securityRemediationEffort_norm")
-redun(column_formula2, data=df)
+find_redundant_metrics(data_df = df)
 
-### This is the main part, running these with either commit-level additions or deletions makes the tables 1-6
-## Normalized metrics
-library(lme4)
+# 3.0 Running the commit-level analyses
+# This is the main part, running these with commit-level additions makes the Tables 3,4, and 5
+# Running these with commit-level deletions makes the Tables 6,7, and 8
 lmer_model_all_in <- glmer(SATD ~ ncloc_norm + sqaleIndex_norm + reliabilityRemediationEffort_norm + securityRemediationEffort_norm  + (1 | projectID/id), data = df, family = "binomial")
 summary(lmer_model_all_in)
 
@@ -212,8 +134,6 @@ summary(lmer_model_minus_ncloc)
 
 lmer_model_minus_sqale <- glmer(SATD ~ ncloc_norm + reliabilityRemediationEffort_norm + securityRemediationEffort_norm  + (1 | projectID/id), data = df, family = "binomial")
 summary(lmer_model_minus_sqale)
-
-
 
 ######## File level
 
