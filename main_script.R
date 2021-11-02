@@ -111,19 +111,6 @@ create_tables_1_and_2 <- function(data_df = df, level="commit")
   print(paste0("Normality test: ", shapiro_test$method, " , W = ", shapiro_test$statistic, " , p-value = ", shapiro_test$p.value))
 }
 
-create_table_2 <- function(data_df = df)
-{
-  df_agg <- aggregate(df$SATD, df[,c("projectID", "commitHash", "fileName")], FUN=length)
-  # Number of pairs
-  print(paste0("Number of pairs: ", nrow(data_df)/2))
-  #KL-SATD in Commits summaries
-  print("Commit summary: ")
-  print(summary(df_agg$x))
-  #Normality test
-  shapiro_test <- shapiro.test(df_agg$x)
-  print(paste0("Normality test: ", shapiro_test$method, " , W = ", shapiro_test$statistic, " , p-value = ", shapiro_test$p.value))
-}
-
 find_redundant_metrics <- function(data_df = df)
 {
   column_formula2 <- as.formula("~ ncloc_norm + sqaleIndex_norm + reliabilityRemediationEffort_norm + securityRemediationEffort_norm")
