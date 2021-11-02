@@ -85,10 +85,22 @@ normalize_data_within_projects <- function(data_df = df)
   return(data_df)
 }
 
-# Creating Table 1
-create_table_1 <- function(data_df = df)
+# Creating Tables 1 & 2
+create_tables_1_and_2 <- function(data_df = df, level="commit")
 {
-  df_agg <- aggregate(df$SATD, df[,c("projectID", "commitHash")], FUN=length)
+  if(level=="commit")
+  {
+    df_agg <- aggregate(df$SATD, df[,c("projectID", "commitHash")], FUN=length)
+  }
+  else if(level=="file")
+  {
+    df_agg <- aggregate(df$SATD, df[,c("projectID", "commitHash", "fileName")], FUN=length)
+  }
+  else if(level!="file" &  level!="commit")
+  {
+    stop("Wrong level.")
+  }
+  
   # Number of pairs
   print(paste0("Number of pairs: ", nrow(data_df)/2))
   #KL-SATD in Commits summaries
@@ -144,7 +156,7 @@ df <- normalize_data_within_projects(data_df = df)
 
 # 2.0 Making the Table 1 & 2 for the paper
 # Table 1 addition row is made with commit-level added data, and deletion row with commit-level deleted data
-create_table_1(data_df = df)
+create_tables_1_and_2(data_df = df, level="commit")
 
 # 2.1 Finding the possibly redundant commit-level metrics
 # p.12 "Before running the analysis on commit-level with Sqale Index, and the 2 Remediation Efforts, 
@@ -182,7 +194,7 @@ df <- eliminate_redundant_data(data_df = df)
 
 # 5.0 Making the Table 2 for the paper
 # Table 2 addition row is made with file-level added data, and deletion row with file-level deleted data
-create_table_2(data_df = df)
+create_tables_1_and_2(data_df = df, level = "file")
 
 # 5.1 Finding the possibly redundant commit-level metrics
 # p.12 "Before running the analysis on commit-level with Sqale Index, and the 2 Remediation Efforts, 
