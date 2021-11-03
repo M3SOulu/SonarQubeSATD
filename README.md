@@ -15,6 +15,9 @@ The "comments" folder includes the paired data either on file or commit level in
 the data from SonarQube's Issues. The folder "tdd_10" includes the data from Sonar measures
 including Sqale Index, and the two Remediation Efforts.
 
+### Running the code
+Running the code in R should be self-explanatory. Just start the main_script.R and follow the instructions. Extra comments hae been added to some sections to notify which part of the paper that specific pieve of code refers to.
+
 ## Citing
 If you are using this script or data, please cite the following paper:
 
