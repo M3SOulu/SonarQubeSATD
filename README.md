@@ -1,5 +1,7 @@
 # Description
-This repository contains the code to replicate the results for paper "Does Self-Admitted Technical Debt impact Code-level Technical Debt? An Empirical Evaluation".
+This repository contains the code to replicate the results and tables for paper "Does Self-Admitted Technical Debt impact Code-level Technical Debt? An Empirical Evaluation". It does not contain the necessary data, which needs to be downlaoded separately.
+
+The project is written completely in R, and requires following packages: dplyr, data.table, reshape2, stringr, Hmisc, and lme4.
 
 ## How to use
 To use this code, you need to download the data needed for it. The link to the data is ...
