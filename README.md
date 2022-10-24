@@ -1,5 +1,5 @@
 # Description
-This repository contains the code to replicate the results and tables for paper "Does Self-Admitted Technical Debt impact Code-level Technical Debt? An Empirical Evaluation". It does not contain the necessary data, which needs to be downloaded separately.
+This repository contains the code to replicate the results and tables for paper "Keyword-Labeled Self-Admitted Technical Debt and Static Code Analysis have Significant Relationship but Limited Overlap". It does not contain the necessary data, which needs to be downloaded separately.
 
 The project is written completely in R, and requires following packages: dplyr, data.table, reshape2, stringr, Hmisc, and lme4.
 
@@ -23,5 +23,5 @@ Running the code in R should be self-explanatory. Just start the main_script.R a
 ## Citing
 If you are using this script or data, please cite the following paper:
 
-Leevi Rantala, Valentina Lenarduzzi, Mika V. Mäntylä. Does Self-Admitted Technical Debt impact Code-level Technical Debt? An Empirical Evaluation.
+Leevi Rantala, Mika V. Mäntylä, Valentina Lenarduzzi. Keyword-Labeled Self-Admitted Technical Debt and Static Code Analysis have Significant Relationship but Limited Overlap.
 
